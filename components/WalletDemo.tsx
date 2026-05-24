@@ -5,9 +5,17 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL, SystemProgram, Transaction } from "@solana/web3.js";
 import { WalletButton } from "./WalletButton";
 
+// Detect cluster from the RPC endpoint for Explorer links
+function getClusterParam(endpoint: string): string {
+  if (endpoint.includes("devnet")) return "?cluster=devnet";
+  if (endpoint.includes("testnet")) return "?cluster=testnet";
+  return ""; // mainnet-beta — no param needed
+}
+
 export function WalletDemo() {
   const { publicKey, connected, signMessage, sendTransaction } = useWallet();
   const { connection } = useConnection();
+  const clusterParam = getClusterParam(connection.rpcEndpoint);
 
   const [sigResult, setSigResult] = useState<string | null>(null);
   const [txidResult, setTxidResult] = useState<string | null>(null);
@@ -118,7 +126,7 @@ export function WalletDemo() {
         <ResultBox
           label="Transaction ID"
           value={txidResult}
-          href={`https://explorer.solana.com/tx/${txidResult}?cluster=devnet`}
+          href={`https://explorer.solana.com/tx/${txidResult}${clusterParam}`}
         />
       )}
       {error && <p style={styles.error}>{error}</p>}

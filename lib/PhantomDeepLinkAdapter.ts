@@ -67,6 +67,7 @@ export class PhantomDeepLinkAdapter extends BaseSignerWalletAdapter {
   private _pendingResolve: ((v: string) => void) | null = null;
   private _pendingReject: ((e: unknown) => void) | null = null;
   private _listenerHandle: { remove: () => void } | null = null;
+  private _pendingTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(config: PhantomDeepLinkAdapterConfig) {
     super();
@@ -124,6 +125,10 @@ export class PhantomDeepLinkAdapter extends BaseSignerWalletAdapter {
 
   private _registerDeepLinkListener() {
     if (!Capacitor.isNativePlatform()) return;
+
+    // Remove any existing listener before registering a new one
+    this._listenerHandle?.remove();
+    this._listenerHandle = null;
 
     App.addListener("appUrlOpen", ({ url }) => {
       this._handleDeepLink(url);
@@ -244,15 +249,31 @@ export class PhantomDeepLinkAdapter extends BaseSignerWalletAdapter {
   }
 
   private _resolvePending(value: string) {
+    if (this._pendingTimeout) {
+      clearTimeout(this._pendingTimeout);
+      this._pendingTimeout = null;
+    }
     this._pendingResolve?.(value);
     this._pendingResolve = null;
     this._pendingReject = null;
   }
 
   private _rejectPending(reason: string) {
+    if (this._pendingTimeout) {
+      clearTimeout(this._pendingTimeout);
+      this._pendingTimeout = null;
+    }
     this._pendingReject?.(new Error(reason));
     this._pendingResolve = null;
     this._pendingReject = null;
+  }
+
+  // Starts a timeout that rejects the pending operation if Phantom never calls back
+  private _startPendingTimeout(label: string, ms = 120_000) {
+    if (this._pendingTimeout) clearTimeout(this._pendingTimeout);
+    this._pendingTimeout = setTimeout(() => {
+      this._rejectPending(`${label} timed out after ${ms / 1000}s — did Phantom return to the app?`);
+    }, ms);
   }
 
   private _clearState() {
@@ -388,6 +409,7 @@ export class PhantomDeepLinkAdapter extends BaseSignerWalletAdapter {
 
       if (Capacitor.isNativePlatform()) {
         window.open(url, "_system");
+        this._startPendingTimeout("signTransaction");
       } else {
         Browser.open({ url, presentationStyle: "popover" }).catch((e) =>
           reject(new WalletSignTransactionError(String(e)))
@@ -434,6 +456,7 @@ export class PhantomDeepLinkAdapter extends BaseSignerWalletAdapter {
 
       if (Capacitor.isNativePlatform()) {
         window.open(url, "_system");
+        this._startPendingTimeout("signMessage");
       } else {
         Browser.open({ url, presentationStyle: "popover" }).catch((e) =>
           reject(new WalletSignMessageError(String(e)))
@@ -443,6 +466,10 @@ export class PhantomDeepLinkAdapter extends BaseSignerWalletAdapter {
   }
 
   destroy() {
+    if (this._pendingTimeout) {
+      clearTimeout(this._pendingTimeout);
+      this._pendingTimeout = null;
+    }
     this._listenerHandle?.remove();
   }
 }

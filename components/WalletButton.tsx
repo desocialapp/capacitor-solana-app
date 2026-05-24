@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { WalletName } from "@solana/wallet-adapter-base";
@@ -21,6 +22,15 @@ export function WalletButton() {
     wallet,
   } = useWallet();
 
+  // After select() updates wallet, trigger connect() automatically
+  const shouldConnect = useRef(false);
+  useEffect(() => {
+    if (shouldConnect.current && wallet && !connected && !connecting) {
+      shouldConnect.current = false;
+      connect().catch(console.error);
+    }
+  }, [wallet, connected, connecting, connect]);
+
   if (!Capacitor.isNativePlatform()) {
     return <WalletMultiButton />;
   }
@@ -40,7 +50,8 @@ export function WalletButton() {
     } else if (wallet) {
       connect().catch(console.error);
     } else {
-      // On native, auto-select the Phantom deep link adapter then connect
+      // select() is async — the useEffect above will call connect() once wallet is set
+      shouldConnect.current = true;
       select("Phantom" as WalletName<"Phantom">);
     }
   }

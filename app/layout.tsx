@@ -19,8 +19,8 @@ export default function RootLayout({
         <SolanaWalletProvider
           appUrl="https://mysolanaapp.com"
           scheme="myapp"
-          cluster={WalletAdapterNetwork.Devnet}
-          endpoint="https://devnet.helius-rpc.com/?api-key=8b9ffdcc-d972-4a9c-964a-9b9710b1ec94"
+          cluster={WalletAdapterNetwork.Mainnet}
+          endpoint="https://api.devnet.solana.com"
         >
           {children}
         </SolanaWalletProvider>
